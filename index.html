@@ -430,7 +430,7 @@
 
       <div class="mic-label">Tap to speak</div>
       <div class="mic-note">
-        Your conversation starts here. We'll connect the microphone in the next step.
+        Tap the mic and answer in Dutch. Speak a short sentence, then pause.
       </div>
 
       <div class="toast" id="micMessage" role="status">
@@ -441,32 +441,188 @@
     <footer class="footer">MADE FOR REAL LIFE IN DUTCH</footer>
   </main>
 
+    
   <script>
-    const hearButton = document.getElementById("hearButton");
-    const micButton = document.getElementById("micButton");
-    const micMessage = document.getElementById("micMessage");
+      const hearButton = document.getElementById("hearButton");
+      const micButton = document.getElementById("micButton");
+      const micMessage = document.getElementById("micMessage");
+      const micLabel = document.querySelector(".mic-label");
+      const micNote = document.querySelector(".mic-note");
 
-    hearButton.addEventListener("click", () => {
-      if (!("speechSynthesis" in window)) {
-        alert("Dutch audio is not supported by this browser.");
-        return;
+      // Show a message underneath the microphone.
+      function showMessage(message) {
+        micMessage.textContent = message;
+        micMessage.classList.add("visible");
       }
 
-      window.speechSynthesis.cancel();
+      // Keep the button label in sync with its state.
+      let recognition = null;
+      let isListening = false;
+      let recognitionFailed = false;
+      let finalTranscript = "";
 
-      const utterance = new SpeechSynthesisUtterance(
-        "Hoi! Wat wil je drinken?"
-      );
+      function setListeningState(listening) {
+        isListening = listening;
+        micLabel.textContent = listening
+          ? "Listening… tap to stop"
+          : "Tap to speak";
 
-      utterance.lang = "nl-NL";
-      utterance.rate = 0.85;
+        micButton.setAttribute(
+          "aria-label",
+          listening ? "Stop listening" : "Start Dutch speech recognition"
+        );
 
-      window.speechSynthesis.speak(utterance);
-    });
+        micButton.setAttribute("aria-pressed", String(listening));
+      }
 
-    micButton.addEventListener("click", () => {
-      micMessage.classList.add("visible");
-    });
-  </script>
+      // Make Pip say the Dutch example aloud.
+      hearButton.addEventListener("click", () => {
+        if (!("speechSynthesis" in window)) {
+          showMessage("Spoken audio isn't available in this browser.");
+          return;
+        }
+
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(
+          "Hoi! Wat wil je drinken?"
+        );
+
+        utterance.lang = "nl-NL";
+        utterance.rate = 0.85;
+
+        utterance.onstart = () => {
+          showMessage("Pip is speaking Dutch…");
+        };
+
+        utterance.onend = () => {
+          showMessage("Your turn! Tap the microphone and answer in Dutch.");
+        };
+
+        utterance.onerror = () => {
+          showMessage("Audio couldn't play. Check your volume and try again.");
+        };
+
+        window.speechSynthesis.speak(utterance);
+      });
+
+      // Support both standard and Safari-prefixed recognition APIs.
+      const SpeechRecognitionAPI =
+        window.SpeechRecognition || window.webkitSpeechRecognition;
+
+      // Listen to one spoken answer in Dutch.
+      micButton.addEventListener("click", () => {
+        // Tapping again stops an active recording.
+        if (isListening && recognition) {
+          recognition.stop();
+          return;
+        }
+
+        if (!SpeechRecognitionAPI) {
+          showMessage(
+            "Speech recognition isn't available here. Open the published " +
+            "website directly in Safari and try again."
+          );
+          return;
+        }
+
+        finalTranscript = "";
+        recognitionFailed = false;
+
+        recognition = new SpeechRecognitionAPI();
+        recognition.lang = "nl-NL";
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+          showMessage("Listening in Dutch… speak a short sentence.");
+          micNote.textContent =
+            "Speak naturally in Dutch, then pause when you're finished.";
+        };
+
+        recognition.onresult = (event) => {
+          let interimTranscript = "";
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript + " ";
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          const liveTranscript =
+            (finalTranscript + " " + interimTranscript).trim();
+
+          if (liveTranscript) {
+            showMessage("I hear: " + liveTranscript);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          recognitionFailed = true;
+          setListeningState(false);
+
+          const messages = {
+            "not-allowed":
+              "Microphone or speech access was denied. Allow access in Safari " +
+              "and try again.",
+            "service-not-allowed":
+              "iOS did not allow speech recognition for this page. " +
+              "Try opening the website directly in Safari.",
+            "no-speech":
+              "I didn't hear anything. Tap the mic and try again.",
+            "network":
+              "Speech recognition couldn't connect. Check your internet " +
+              "connection and try again.",
+            "audio-capture":
+              "No microphone was detected. Check microphone permissions.",
+            "aborted":
+              "Listening stopped. Tap the mic whenever you're ready."
+          };
+
+          showMessage(
+            messages[event.error] ||
+            "Speech recognition failed (" + event.error + "). Try again."
+          );
+        };
+
+        recognition.onend = () => {
+          setListeningState(false);
+
+          if (recognitionFailed) {
+            return;
+          }
+
+          const answer = finalTranscript.trim();
+
+          if (answer) {
+            showMessage("You said: " + answer);
+            micNote.textContent =
+              "Great, we captured your Dutch. Next, we'll add corrections and replies.";
+          } else {
+            showMessage("I didn't catch that. Tap the mic and try once more.");
+          }
+        };
+
+        setListeningState(true);
+        showMessage("Starting the microphone…");
+
+        try {
+          recognition.start();
+        } catch (error) {
+          recognitionFailed = true;
+          setListeningState(false);
+
+          showMessage(
+            "Couldn't start listening. Please try again in Safari."
+          );
+        }
+      });
+    </script>
+
 </body>
 </html>
