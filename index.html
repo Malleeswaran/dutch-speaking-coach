@@ -442,27 +442,175 @@
   </main>
 
     
-  <script>
+      <script>
       const hearButton = document.getElementById("hearButton");
       const micButton = document.getElementById("micButton");
       const micMessage = document.getElementById("micMessage");
       const micLabel = document.querySelector(".mic-label");
       const micNote = document.querySelector(".mic-note");
+      const dutchPhrase = document.querySelector(".dutch-phrase");
+      const translation = document.querySelector(".translation");
+      const lessonNumber = document.querySelector(".lesson-number");
 
-      // Show a message underneath the microphone.
-      function showMessage(message) {
-        micMessage.textContent = message;
-        micMessage.classList.add("visible");
+      // This is the first lesson. We'll add more situations later.
+      const LESSON_ID = "cafe-order-001";
+      const PROGRESS_KEY = "praat-progress-v1";
+
+      const turns = [
+        {
+          dutch: "Hoi! Wat wil je drinken?",
+          english: "Hi! What would you like to drink?"
+        },
+        {
+          dutch: "Prima! Wil je er iets bij eten?",
+          english: "Great! Would you like something to eat with it?"
+        }
+      ];
+
+      // Drinks the tutor can recognise in this lesson.
+      const drinks = [
+        {
+          pattern: /\bcappuccino\b/,
+          example: "Ik wil graag een cappuccino, alstublieft."
+        },
+        {
+          pattern: /\bkoffie\b/,
+          example: "Ik wil graag een koffie, alstublieft."
+        },
+        {
+          pattern: /\bthee\b/,
+          example: "Ik wil graag thee, alstublieft."
+        },
+        {
+          pattern: /\bwater\b/,
+          example: "Ik wil graag een glas water, alstublieft."
+        },
+        {
+          pattern: /\blatte\b/,
+          example: "Ik wil graag een latte, alstublieft."
+        },
+        {
+          pattern: /\bespresso\b/,
+          example: "Ik wil graag een espresso, alstublieft."
+        },
+        {
+          pattern: /\b(chocolademelk|chocomel)\b/,
+          example: "Ik wil graag chocolademelk, alstublieft."
+        },
+        {
+          pattern: /\bfrisdrank\b/,
+          example: "Ik wil graag een frisdrank, alstublieft."
+        }
+      ];
+
+      function loadProgress() {
+        try {
+          const saved = JSON.parse(
+            localStorage.getItem(PROGRESS_KEY) || "{}"
+          );
+
+          return {
+            completedLessons: Array.isArray(saved.completedLessons)
+              ? saved.completedLessons
+              : []
+          };
+        } catch (error) {
+          return { completedLessons: [] };
+        }
       }
 
-      // Keep the button label in sync with its state.
+      function saveLessonProgress() {
+        try {
+          const progress = loadProgress();
+
+          if (!progress.completedLessons.includes(LESSON_ID)) {
+            progress.completedLessons.push(LESSON_ID);
+          }
+
+          localStorage.setItem(
+            PROGRESS_KEY,
+            JSON.stringify(progress)
+          );
+
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      let currentTurn = 0;
+      let currentSpeechText = turns[0].dutch;
+      let lessonComplete = loadProgress()
+        .completedLessons.includes(LESSON_ID);
+
       let recognition = null;
       let isListening = false;
       let recognitionFailed = false;
       let finalTranscript = "";
 
+      const SpeechRecognitionAPI =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+      function showMessage(message) {
+        micMessage.textContent = message;
+        micMessage.classList.add("visible");
+      }
+
+      function normalizeText(text) {
+        return text
+          .toLocaleLowerCase("nl-NL")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[.,!?;:]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
+      function setTutorPrompt(dutch, english) {
+        dutchPhrase.textContent = dutch;
+        translation.textContent = english;
+
+        currentSpeechText = dutch;
+        hearButton.textContent = "Hear the Dutch";
+      }
+
+      function setExampleToHear(example) {
+        currentSpeechText = example;
+        hearButton.textContent = "Hear a natural answer";
+      }
+
+      function speakDutch(text) {
+        if (!("speechSynthesis" in window)) {
+          showMessage(
+            "Dutch audio is unavailable here. You can still read the text."
+          );
+          return;
+        }
+
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "nl-NL";
+        utterance.rate = 0.85;
+
+        utterance.onerror = () => {
+          showMessage(
+            "Audio couldn't play. Tap the Dutch audio button to try again."
+          );
+        };
+
+        window.speechSynthesis.speak(utterance);
+      }
+
       function setListeningState(listening) {
         isListening = listening;
+
+        if (lessonComplete) {
+          micLabel.textContent = "Lesson complete";
+          return;
+        }
+
         micLabel.textContent = listening
           ? "Listening… tap to stop"
           : "Tap to speak";
@@ -475,44 +623,178 @@
         micButton.setAttribute("aria-pressed", String(listening));
       }
 
-      // Make Pip say the Dutch example aloud.
-      hearButton.addEventListener("click", () => {
-        if (!("speechSynthesis" in window)) {
-          showMessage("Spoken audio isn't available in this browser.");
+      function askForRetry(answer, explanation, example) {
+        showMessage(
+          'I heard "' + answer + '". ' + explanation
+        );
+
+        setExampleToHear(example);
+
+        micNote.textContent =
+          "Give it another try. You can listen to the suggested Dutch first.";
+      }
+
+      function advanceToFollowUp(answer, feedback) {
+        currentTurn = 1;
+
+        setTutorPrompt(
+          turns[1].dutch,
+          turns[1].english
+        );
+
+        micNote.textContent =
+          "Answer Pip's follow-up in Dutch. There's more than one good answer.";
+
+        showMessage(
+          'I heard "' + answer + '". ' + feedback
+        );
+
+        // Pip asks the next question aloud.
+        speakDutch(turns[1].dutch);
+      }
+
+      function finishLesson(answer) {
+        lessonComplete = true;
+
+        const progressSaved = saveLessonProgress();
+
+        setTutorPrompt(
+          "Goed gedaan!",
+          "Well done! You've handled the café conversation."
+        );
+
+        lessonNumber.textContent = "CONVERSATION COMPLETE";
+
+        micButton.disabled = true;
+        micButton.style.opacity = "0.55";
+        micButton.setAttribute("aria-label", "Lesson completed");
+
+        micLabel.textContent = "Lesson complete";
+
+        micNote.textContent =
+          "This situation is complete. Your next lesson will cover a new topic.";
+
+        showMessage(
+          'I heard "' + answer + '". Goed gedaan! ' +
+          "You've completed this café conversation. " +
+          (progressSaved
+            ? "Your progress is saved on this device."
+            : "Your progress could not be saved. Check your browser storage.")
+        );
+
+        speakDutch("Goed gedaan! Je hebt besteld.");
+      }
+
+      function handleCafeAnswer(answer) {
+        if (lessonComplete) return;
+
+        const text = normalizeText(answer);
+
+        if (!text) {
+          showMessage("I didn't catch that. Try speaking once more.");
           return;
         }
 
-        window.speechSynthesis.cancel();
+        // TURN 1: Order a drink.
+        if (currentTurn === 0) {
+          const drink = drinks.find(item => item.pattern.test(text));
 
-        const utterance = new SpeechSynthesisUtterance(
-          "Hoi! Wat wil je drinken?"
+          if (!drink) {
+            askForRetry(
+              answer,
+              "I didn't catch which drink you want. Try ordering koffie, thee, or a cappuccino.",
+              "Ik wil graag een cappuccino, alstublieft."
+            );
+            return;
+          }
+
+          const requestPattern =
+            /\b(graag|alstublieft|alsjeblieft|mag ik|kan ik|ik wil|ik neem|doe maar|zou ik|een|twee)\b/;
+
+          const politePattern =
+            /\b(graag|alstublieft|alsjeblieft|mag ik|ik neem|doe maar|zou ik)\b/;
+
+          if (!requestPattern.test(text)) {
+            askForRetry(
+              answer,
+              "I understood the drink, but let's turn it into a complete order. Try the example below, or say something like 'Een cappuccino, graag.'",
+              drink.example
+            );
+            return;
+          }
+
+          // Understandable answers can pass, with a tip where useful.
+          if (!politePattern.test(text)) {
+            advanceToFollowUp(
+              answer,
+              "Nice, I understood your order! Tiny upgrade: adding 'graag' makes it sound softer and more natural at a café."
+            );
+          } else {
+            advanceToFollowUp(
+              answer,
+              "Mooi! Your order was clear and polite. Let's keep the conversation going."
+            );
+          }
+
+          return;
+        }
+
+        // TURN 2: Reply to the food question.
+        const saysNo = /\bnee\b|\bliever niet\b|\bhoeft niet\b/.test(text);
+
+        const saysThanks =
+          /\bdank\b|\bbedankt\b|\bdankjewel\b|\bdankuwel\b|\bdanku\b/.test(text);
+
+        const saysYes =
+          /\bja\b|\bzeker\b|\bgraag\b|\bdoe maar\b|\blekker\b/.test(text);
+
+        const mentionsFood =
+          /\bcroissant\b|\bbroodje\b|\btaart\b|\bkoek\b|\bcake\b|\bmuffin\b|\bappeltaart\b|\btosti\b|\bsandwich\b|\bbrood\b|\bgebak\b/.test(text);
+
+        if (saysNo) {
+          if (saysThanks) {
+            finishLesson(answer);
+          } else {
+            askForRetry(
+              answer,
+              "That makes sense! In a casual café, 'Nee, dank je' sounds friendlier. Try saying that once.",
+              "Nee, dank je."
+            );
+          }
+
+          return;
+        }
+
+        if (mentionsFood || (saysYes && /\bgraag\b|\bzeker\b|\bdoe maar\b|\blekker\b/.test(text))) {
+          finishLesson(answer);
+          return;
+        }
+
+        if (saysYes) {
+          askForRetry(
+            answer,
+            "Good start! Make your answer a little more natural with 'Ja, graag' or 'Ja, een croissant, graag.'",
+            "Ja, graag."
+          );
+          return;
+        }
+
+        askForRetry(
+          answer,
+          "I wasn't sure whether you'd like something to eat. Try 'Nee, dank je' or 'Ja, graag.'",
+          "Nee, dank je."
         );
+      }
 
-        utterance.lang = "nl-NL";
-        utterance.rate = 0.85;
-
-        utterance.onstart = () => {
-          showMessage("Pip is speaking Dutch…");
-        };
-
-        utterance.onend = () => {
-          showMessage("Your turn! Tap the microphone and answer in Dutch.");
-        };
-
-        utterance.onerror = () => {
-          showMessage("Audio couldn't play. Check your volume and try again.");
-        };
-
-        window.speechSynthesis.speak(utterance);
+      // Replay either Pip's question or the suggested answer.
+      hearButton.addEventListener("click", () => {
+        speakDutch(currentSpeechText);
       });
 
-      // Support both standard and Safari-prefixed recognition APIs.
-      const SpeechRecognitionAPI =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
-
-      // Listen to one spoken answer in Dutch.
+      // Start and stop Dutch speech recognition.
       micButton.addEventListener("click", () => {
-        // Tapping again stops an active recording.
+        if (lessonComplete) return;
+
         if (isListening && recognition) {
           recognition.stop();
           return;
@@ -520,8 +802,7 @@
 
         if (!SpeechRecognitionAPI) {
           showMessage(
-            "Speech recognition isn't available here. Open the published " +
-            "website directly in Safari and try again."
+            "Speech recognition isn't available here. Open Praat directly in Safari and try again."
           );
           return;
         }
@@ -536,12 +817,12 @@
         recognition.maxAlternatives = 1;
 
         recognition.onstart = () => {
-          showMessage("Listening in Dutch… speak a short sentence.");
+          showMessage("Listening in Dutch… speak naturally, then pause.");
           micNote.textContent =
-            "Speak naturally in Dutch, then pause when you're finished.";
+            "Speak in Dutch and pause when you've finished your answer.";
         };
 
-        recognition.onresult = (event) => {
+        recognition.onresult = event => {
           let interimTranscript = "";
 
           for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -554,57 +835,50 @@
             }
           }
 
-          const liveTranscript =
+          const heardText =
             (finalTranscript + " " + interimTranscript).trim();
 
-          if (liveTranscript) {
-            showMessage("I hear: " + liveTranscript);
+          if (heardText) {
+            showMessage("I hear: " + heardText);
           }
         };
 
-        recognition.onerror = (event) => {
+        recognition.onerror = event => {
           recognitionFailed = true;
           setListeningState(false);
 
           const messages = {
             "not-allowed":
-              "Microphone or speech access was denied. Allow access in Safari " +
-              "and try again.",
+              "Microphone or speech access was denied. Check Safari's permissions.",
             "service-not-allowed":
-              "iOS did not allow speech recognition for this page. " +
-              "Try opening the website directly in Safari.",
+              "iOS didn't allow speech recognition for this page. Try Safari directly.",
             "no-speech":
               "I didn't hear anything. Tap the mic and try again.",
             "network":
-              "Speech recognition couldn't connect. Check your internet " +
-              "connection and try again.",
+              "Speech recognition couldn't connect. Check your internet.",
             "audio-capture":
-              "No microphone was detected. Check microphone permissions.",
+              "No microphone was detected. Check your microphone permissions.",
             "aborted":
-              "Listening stopped. Tap the mic whenever you're ready."
+              "Listening stopped. Tap the mic when you're ready."
           };
 
           showMessage(
             messages[event.error] ||
-            "Speech recognition failed (" + event.error + "). Try again."
+            "Speech recognition failed. Please try again."
           );
         };
 
         recognition.onend = () => {
           setListeningState(false);
 
-          if (recognitionFailed) {
-            return;
-          }
+          if (recognitionFailed) return;
 
           const answer = finalTranscript.trim();
 
           if (answer) {
-            showMessage("You said: " + answer);
-            micNote.textContent =
-              "Great, we captured your Dutch. Next, we'll add corrections and replies.";
+            handleCafeAnswer(answer);
           } else {
-            showMessage("I didn't catch that. Tap the mic and try once more.");
+            showMessage("I didn't catch that. Tap the mic and try again.");
           }
         };
 
@@ -622,6 +896,33 @@
           );
         }
       });
+
+      // Don't repeat this lesson after it has been completed.
+      function restoreCompletedLesson() {
+        if (!lessonComplete) return;
+
+        setTutorPrompt(
+          "Goed gedaan!",
+          "You've already completed this café conversation."
+        );
+
+        lessonNumber.textContent = "CONVERSATION COMPLETE";
+
+        micButton.disabled = true;
+        micButton.style.opacity = "0.55";
+        micButton.setAttribute("aria-label", "Lesson completed");
+
+        micLabel.textContent = "Lesson complete";
+
+        micNote.textContent =
+          "Your progress is saved on this device. We'll add another situation next.";
+
+        showMessage(
+          "You've already completed this café situation. It won't be repeated."
+        );
+      }
+
+      restoreCompletedLesson();
     </script>
 
 </body>
