@@ -1,0 +1,472 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#F6F5F0">
+  <title>Praat — Your Dutch practice</title>
+
+  <style>
+    :root {
+      --paper: #F6F5F0;
+      --ink: #233832;
+      --muted: #78837C;
+      --green: #31594A;
+      --soft-green: #E5EBE3;
+      --orange: #F0B66B;
+      --white: #FFFFFF;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 430px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0 auto;
+      padding: max(18px, env(safe-area-inset-top))
+        23px max(20px, env(safe-area-inset-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 23px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 23px;
+      font-weight: 800;
+      letter-spacing: -1.2px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 35px;
+      height: 35px;
+      border-radius: 13px 13px 13px 4px;
+      background: var(--green);
+      color: white;
+      font-size: 17px;
+      letter-spacing: -1px;
+    }
+
+    .level {
+      padding: 9px 12px;
+      border: 1px solid #DDE1D8;
+      border-radius: 30px;
+      color: var(--green);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.1px;
+    }
+
+    .intro {
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .eyebrow {
+      color: #728074;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.7px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 340px;
+      font-size: clamp(34px, 9vw, 43px);
+      font-weight: 750;
+      letter-spacing: -2px;
+      line-height: 1.08;
+    }
+
+    .intro p {
+      max-width: 315px;
+      margin: 0;
+      color: #747F77;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .lesson-card {
+      padding: 20px;
+      border: 1px solid #E6E6DE;
+      border-radius: 25px;
+      background: var(--white);
+      box-shadow: 0 8px 28px #293B2910;
+    }
+
+    .lesson-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .lesson-number {
+      color: #758178;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1.3px;
+    }
+
+    .difficulty {
+      padding: 6px 9px;
+      border-radius: 30px;
+      background: var(--soft-green);
+      color: var(--green);
+      font-size: 10px;
+      font-weight: 750;
+    }
+
+    h2 {
+      margin: 17px 0 6px;
+      font-size: 25px;
+      letter-spacing: -0.8px;
+    }
+
+    .lesson-description {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .divider {
+      height: 1px;
+      margin: 18px 0;
+      background: #ECEDE7;
+    }
+
+    .tutor-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .character {
+      position: relative;
+      flex-shrink: 0;
+      width: 54px;
+      height: 58px;
+      border-radius: 48% 48% 43% 43%;
+      background: var(--orange);
+      transform: rotate(-4deg);
+    }
+
+    .character::before,
+    .character::after {
+      position: absolute;
+      top: 24px;
+      width: 5px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ink);
+      content: "";
+    }
+
+    .character::before {
+      left: 16px;
+    }
+
+    .character::after {
+      right: 16px;
+    }
+
+    .face-smile {
+      position: absolute;
+      top: 31px;
+      left: 21px;
+      width: 12px;
+      height: 6px;
+      border-bottom: 2px solid var(--ink);
+      border-radius: 0 0 12px 12px;
+    }
+
+    .tutor-copy {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .tutor-name {
+      margin: 1px 0 7px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .dutch-phrase {
+      margin: 0 0 5px;
+      font-size: 19px;
+      font-weight: 750;
+      letter-spacing: -0.45px;
+      line-height: 1.3;
+    }
+
+    .translation {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .hear-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 13px;
+      padding: 8px 11px;
+      border: 1px solid #E5E8E0;
+      border-radius: 30px;
+      background: white;
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 750;
+    }
+
+    .practice {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 11px;
+      text-align: center;
+    }
+
+    .practice h3 {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: -0.5px;
+    }
+
+    .practice p {
+      margin: -4px 0 2px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .mic-button {
+      display: grid;
+      place-items: center;
+      width: 78px;
+      height: 78px;
+      margin: 1px 0 0;
+      border: 0;
+      border-radius: 50%;
+      background: var(--green);
+      color: white;
+      box-shadow: 0 7px 0 #244438, 0 12px 25px #31594A25;
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+
+    .mic-button:active {
+      transform: translateY(4px);
+      box-shadow: 0 3px 0 #244438;
+    }
+
+    .mic-button svg {
+      width: 29px;
+      height: 29px;
+    }
+
+    .mic-label {
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .mic-note {
+      max-width: 270px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      display: none;
+      padding: 10px 13px;
+      border-radius: 12px;
+      background: var(--soft-green);
+      color: var(--green);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .toast.visible {
+      display: block;
+    }
+
+    .footer {
+      margin-top: auto;
+      padding-top: 5px;
+      color: #929B92;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      text-align: center;
+    }
+
+    @media (max-height: 750px) {
+      .app {
+        gap: 16px;
+      }
+
+      .lesson-card {
+        padding: 16px;
+      }
+
+      h2 {
+        margin-top: 12px;
+      }
+
+      .divider {
+        margin: 13px 0;
+      }
+
+      .mic-button {
+        width: 68px;
+        height: 68px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">p.</span>
+        praat
+      </div>
+      <span class="level">DUTCH · A2</span>
+    </header>
+
+    <section class="intro">
+      <div class="eyebrow">A little Dutch, every day</div>
+      <h1>Less translating.<br>More talking.</h1>
+      <p>Practise real conversations, make mistakes, and find your flow in Dutch.</p>
+    </section>
+
+    <section class="lesson-card">
+      <div class="lesson-meta">
+        <span class="lesson-number">YOUR FIRST CONVERSATION</span>
+        <span class="difficulty">A2 · BEGINNER+</span>
+      </div>
+
+      <h2>At the coffee bar</h2>
+      <p class="lesson-description">
+        Order your favourite drink and handle a little follow-up question.
+      </p>
+
+      <div class="divider"></div>
+
+      <div class="tutor-row">
+        <div class="character" aria-label="Your tutor Pip">
+          <span class="face-smile"></span>
+        </div>
+
+        <div class="tutor-copy">
+          <div class="tutor-name">Pip · Your Dutch buddy</div>
+          <p class="dutch-phrase">Hoi! Wat wil je drinken?</p>
+          <p class="translation">Hi! What would you like to drink?</p>
+          <button class="hear-button" id="hearButton" type="button">
+            <span aria-hidden="true">♫</span>
+            Hear the Dutch
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="practice">
+      <h3>Your turn</h3>
+      <p>Answer in Dutch. It's okay to get it wrong.</p>
+
+      <button class="mic-button" id="micButton"
+        type="button" aria-label="Microphone setup coming next">
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="12" rx="3"
+            stroke="currentColor" stroke-width="2"/>
+          <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3m-4 0h8"
+            stroke="currentColor" stroke-width="2"
+            stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <div class="mic-label">Tap to speak</div>
+      <div class="mic-note">
+        Your conversation starts here. We'll connect the microphone in the next step.
+      </div>
+
+      <div class="toast" id="micMessage" role="status">
+        Your tutor screen is ready! Next, we'll connect Dutch speech input.
+      </div>
+    </section>
+
+    <footer class="footer">MADE FOR REAL LIFE IN DUTCH</footer>
+  </main>
+
+  <script>
+    const hearButton = document.getElementById("hearButton");
+    const micButton = document.getElementById("micButton");
+    const micMessage = document.getElementById("micMessage");
+
+    hearButton.addEventListener("click", () => {
+      if (!("speechSynthesis" in window)) {
+        alert("Dutch audio is not supported by this browser.");
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(
+        "Hoi! Wat wil je drinken?"
+      );
+
+      utterance.lang = "nl-NL";
+      utterance.rate = 0.85;
+
+      window.speechSynthesis.speak(utterance);
+    });
+
+    micButton.addEventListener("click", () => {
+      micMessage.classList.add("visible");
+    });
+  </script>
+</body>
+</html>
